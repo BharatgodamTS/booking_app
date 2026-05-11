@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  password      String
+  role          String    @default("CLIENT") // ADMIN, OWNER, CLIENT
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  warehouses    Warehouse[] // For OWNERS
+  bookings      Booking[]   // For CLIENTS
+  transactions  Transaction[]
+}
+
+model Warehouse {
+  id                String    @id @default(cuid())
+  name              String
+  address           String
+  totalCapacity     Float     // In Metric Tons (MT)
+  availableCapacity Float     // Current capacity in MT
+  pricing           Float     // Price per MT
+  features          String    // Comma-separated list
+  status            String    @default("PENDING") // PENDING, APPROVED, REJECTED, DEACTIVATED
+  rejectionReason   String?   // Feedback for owners if rejected
+  ownerId           String
+  owner             User      @relation(fields: [ownerId], references: [id])
+  bookings          Booking[]
+  stockMovements    StockMovement[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+
+model Booking {
+  id                  String        @id @default(cuid())
+  warehouseId         String
+  warehouse           Warehouse     @relation(fields: [warehouseId], references: [id])
+  clientId            String?       
+  client              User?         @relation(fields: [clientId], references: [id])
+  manualClientName    String?       
+  manualClientContact String?       
+  weight              Float         // Weight in Metric Tons (MT)
+  commodityType       String?       // Grains, Chemicals, etc.
+  startDate           DateTime
+  endDate             DateTime
+  status              String        @default("PENDING") 
+  bookingType         String        @default("PLATFORM") 
+  transactions        Transaction[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model StockMovement {
+  id            String    @id @default(cuid())
+  warehouseId   String
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
+  type          String    // INBOUND or OUTBOUND
+  commodity     String
+  weight        Float     // In MT
+  truckNumber   String?
+  driverName    String?
+  biltyNumber   String?   @unique // Professional Receipt Number
+  partyName     String?   // The client or vendor name
+  status        String    @default("COMPLETED")
+  timestamp     DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+}
+
+model Transaction {
+  id            String    @id @default(cuid())
+  bookingId     String?
+  booking       Booking?  @relation(fields: [bookingId], references: [id])
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  amount        Float
+  type          String    // e.g., PAYMENT, REFUND
+  status        String    // e.g., SUCCESS, FAILED
+  createdAt     DateTime  @default(now())
+}
