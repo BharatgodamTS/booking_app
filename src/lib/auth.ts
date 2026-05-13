@@ -7,13 +7,13 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      role: "ADMIN" | "OWNER" | "CLIENT";
+      role: "ADMIN" | "OWNER" | "WAREHOUSE_OWNER" | "CLIENT";
     } & DefaultSession["user"];
   }
 
   interface User {
     id: string;
-    role: "ADMIN" | "OWNER" | "CLIENT";
+    role: "ADMIN" | "OWNER" | "WAREHOUSE_OWNER" | "CLIENT";
   }
 }
 
@@ -51,7 +51,7 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role as "ADMIN" | "OWNER" | "CLIENT",
+          role: user.role as any,
         };
       },
     }),
@@ -59,25 +59,30 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = user.role;
         token.id = user.id;
+        token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role as "ADMIN" | "OWNER" | "CLIENT";
         session.user.id = token.id as string;
+        session.user.role = token.role as any;
       }
       return session;
     },
-    async signIn({ user }) {
-      // In NextAuth v4, returning a string in signIn callback will redirect the user
-      if (user.role === 'ADMIN') return '/admin/users';
-      if (user.role === 'CLIENT') return '/dashboard/client';
-      if (user.role === 'OWNER') return '/dashboard/warehouse/dashboard';
-      return true;
-    }
+    async redirect({ url, baseUrl, user }) {
+      // If we have a user object (during sign-in), redirect based on role
+      const role = (user as any)?.role;
+      if (role === 'ADMIN') return `${baseUrl}/admin/users`;
+      if (role === 'OWNER' || role === 'WAREHOUSE_OWNER') return `${baseUrl}/dashboard/warehouse`;
+      if (role === 'CLIENT') return `${baseUrl}/dashboard/client`;
+
+      // Fallback for relative and absolute URLs
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      else if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
+    },
   },
   session: {
     strategy: "jwt",

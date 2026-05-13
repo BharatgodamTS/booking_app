@@ -15,10 +15,10 @@ export default async function WarehouseDashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc]">
+    <div className="flex min-h-screen bg-[#f1f5f9]">
       <WarehouseSidebar />
-      <main className="flex-1 lg:ml-64 p-6 lg:p-10">
-        <div className="max-w-[1600px] mx-auto">
+      <main className="flex-1 lg:ml-60 p-4 lg:p-6">
+        <div className="max-w-screen-2xl mx-auto">
           {children}
         </div>
       </main>

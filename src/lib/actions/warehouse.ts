@@ -63,9 +63,12 @@ export async function createWarehouse(data: {
 
 export async function getOwnerWarehouses() {
   try {
+    console.log("🔍 [LOGISTICS] Fetching owner warehouses...");
     const session = await getServerSession(authOptions);
+    console.log("👤 [LOGISTICS] Session retrieved for role:", session?.user?.role);
 
     if (!session?.user?.id) {
+      console.warn("⚠️ [LOGISTICS] No user ID found in session.");
       return [];
     }
 
@@ -77,13 +80,14 @@ export async function getOwnerWarehouses() {
         createdAt: 'desc',
       },
     });
+    console.log(`✅ [LOGISTICS] Successfully retrieved ${warehouses.length} warehouses.`);
 
     return warehouses.map(w => ({
       ...w,
       features: w.features ? w.features.split(",") : []
     }));
   } catch (error) {
-    console.error("[GET_WAREHOUSES_ERROR]", error);
+    console.error("❌ [GET_WAREHOUSES_ERROR]", error);
     return [];
   }
 }
@@ -91,37 +95,34 @@ export async function getOwnerWarehouses() {
 export async function getDashboardStats() {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session?.user?.id) {
-      return { totalCount: 0, totalCapacity: 0, avgOccupancy: 0, totalMonthlyRevenue: 0 };
+      return { totalTransactions: 0, currentInventory: 0, activeWarehouses: 0, pendingRequests: 0 };
     }
 
-    const warehouses = await prisma.warehouse.findMany({
-      where: {
-        ownerId: session.user.id,
-      },
-    });
+    const [warehouses, bookings] = await Promise.all([
+      prisma.warehouse.findMany({
+        where: { ownerId: session.user.id }
+      }),
+      prisma.booking.findMany({
+        where: { warehouse: { ownerId: session.user.id } }
+      })
+    ]);
 
-    const totalCount = warehouses.length;
-    const totalCapacity = warehouses.reduce((sum, w) => sum + w.totalCapacity, 0);
-    const totalMonthlyRevenue = warehouses.reduce((sum, w) => sum + w.pricing, 0);
-    
-    let totalOccupancyRate = 0;
-    if (totalCount > 0) {
-      totalOccupancyRate = warehouses.reduce((sum, w) => {
-        const occupied = w.totalCapacity - w.availableCapacity;
-        return sum + (occupied / w.totalCapacity);
-      }, 0) / totalCount;
-    }
+    const activeWarehouses = warehouses.filter(w => w.status === 'APPROVED').length;
+    const pendingRequests = bookings.filter(b => b.status === 'PENDING').length;
+    const totalTransactions = bookings.length;
+    const currentInventory = bookings
+      .filter(b => b.status === 'APPROVED')
+      .reduce((sum, b) => sum + (b.weight || 0), 0);
 
     return {
-      totalCount,
-      totalCapacity, // Now in MT
-      avgOccupancy: Math.round(totalOccupancyRate * 100),
-      totalMonthlyRevenue
+      totalTransactions,
+      currentInventory,
+      activeWarehouses,
+      pendingRequests
     };
   } catch (error) {
-    console.error("[GET_STATS_ERROR]", error);
-    return { totalCount: 0, totalCapacity: 0, avgOccupancy: 0, totalMonthlyRevenue: 0 };
+    console.error("[GET_LOGISTICS_STATS_ERROR]", error);
+    return { totalTransactions: 0, currentInventory: 0, activeWarehouses: 0, pendingRequests: 0 };
   }
 }

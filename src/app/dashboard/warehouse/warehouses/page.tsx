@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { 
   Plus, 
-  Search, 
-  Filter, 
-  Sparkles,
-  Loader2,
-  LayoutGrid,
-  List
+  Home, 
+  MapPin, 
+  Maximize, 
+  IndianRupee,
+  ShieldCheck,
+  Search,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -20,17 +21,15 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 import { WarehouseForm } from "@/components/features/WarehouseForm";
-import { WarehouseTiltCard } from "@/components/shared/WarehouseTiltCard";
 import { getOwnerWarehouses } from "@/lib/actions/warehouse";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-export default function WarehousesManagementPage() {
+export default function WarehouseInventory() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const fetchWarehouses = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
     const data = await getOwnerWarehouses();
     setWarehouses(data);
@@ -38,102 +37,112 @@ export default function WarehousesManagementPage() {
   };
 
   useEffect(() => {
-    fetchWarehouses();
+    fetchData();
   }, []);
 
+  if (isLoading) return <div className="p-10 animate-pulse space-y-8"><div className="h-40 bg-slate-100 rounded-2xl" /><div className="h-96 bg-slate-50 rounded-3xl" /></div>;
+
   return (
-    <div className="space-y-12 pb-20">
-      {/* Bespoke Page Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-10 border-b border-brand-charcoal/5 pb-12">
-        <div className="space-y-6">
-          <div className="flex items-center gap-3 text-brand-orange">
-            <div className="h-px w-8 bg-brand-orange" />
-            <span className="text-[10px] font-black uppercase tracking-[0.4em]">Node Management</span>
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-6xl font-serif font-black tracking-tighter text-brand-charcoal leading-none">
-              Facility <span className="italic text-brand-orange">Directory</span>
-            </h1>
-            <p className="text-slate-400 font-medium max-w-lg">
-              Coordinate your storage network through a bespoke management layer. Monitor availability, pricing, and operational status in real-time.
-            </p>
-          </div>
+    <div className="space-y-4 pb-12">
+      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div className="space-y-0.5">
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight">Inventory Master</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Storage Asset Management</p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-brand-charcoal hover:bg-brand-charcoal/90 text-white h-16 px-10 rounded-[1.5rem] gap-3 font-bold shadow-2xl shadow-brand-charcoal/30 group transition-all duration-500 hover:scale-105">
-              <Plus strokeWidth={2.5} className="h-5 w-5 group-hover:rotate-90 transition-transform" />
-              Register New Node
+            <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-4 rounded-lg gap-2 font-bold shadow-sm">
+              <Plus strokeWidth={2} className="h-4 w-4" />
+              Add Facility
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-3xl bg-brand-cream border border-brand-charcoal/5 p-10 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.2)] rounded-[3rem] overflow-y-auto max-h-[90vh]">
-            <DialogHeader className="mb-10 text-left">
-              <div className="h-14 w-14 rounded-2xl bg-brand-orange/10 flex items-center justify-center mb-6">
-                <Sparkles strokeWidth={1.5} className="h-7 w-7 text-brand-orange" />
-              </div>
-              <DialogTitle className="text-4xl font-serif font-black text-brand-charcoal tracking-tighter">New Node <span className="italic text-brand-orange">Protocol</span></DialogTitle>
-              <DialogDescription className="text-slate-500 font-medium text-lg mt-2">
-                Initialize a new storage facility into the elite BharatGodam network.
+          <DialogContent className="sm:max-w-2xl bg-white p-6 rounded-xl border border-slate-200">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">New Asset Protocol</DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Register a new storage facility into the network.
               </DialogDescription>
             </DialogHeader>
             <WarehouseForm onSuccess={() => {
-              setIsDialogOpen(false);
-              fetchWarehouses();
+              setIsOpen(false);
+              fetchData();
             }} />
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Bespoke Hub Controls */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="relative w-full md:w-[450px] group">
-          <Search strokeWidth={1.5} className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300 group-hover:text-brand-orange transition-colors" />
-          <input 
-            placeholder="Search by strategic location or node name..."
-            className="w-full pl-14 pr-6 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-sm font-medium focus:ring-4 focus:ring-brand-orange/5 focus:border-brand-orange/20 outline-none transition-all shadow-ambient"
-          />
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" className="h-12 px-6 rounded-2xl gap-2 font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-brand-charcoal hover:bg-white transition-all border border-transparent hover:border-slate-100">
-            <Filter strokeWidth={1.5} className="h-4 w-4" /> Refine View
-          </Button>
-          <div className="flex items-center bg-white p-1.5 rounded-2xl shadow-ambient border border-slate-50">
-            <button className="p-2.5 bg-brand-charcoal text-white rounded-[0.8rem] shadow-xl shadow-brand-charcoal/20 transition-all active:scale-95">
-              <LayoutGrid strokeWidth={1.5} className="h-4 w-4" />
-            </button>
-            <button className="p-2.5 text-slate-400 hover:text-brand-charcoal transition-all">
-              <List strokeWidth={1.5} className="h-4 w-4" />
-            </button>
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+          <h2 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Assets ({warehouses.length})</h2>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-300" />
+            <input 
+              placeholder="Search..."
+              className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-medium outline-none w-48"
+            />
           </div>
         </div>
-      </div>
 
-      {/* Bento-style Card Grid */}
-      <AnimatePresence mode="wait">
-        {isLoading ? (
-          <motion.div 
-            key="loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-          >
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-[400px] w-full bg-white animate-pulse rounded-[2.5rem] border border-slate-100" />
-            ))}
-          </motion.div>
-        ) : (
-          <motion.div 
-            key="content"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-          >
-            {warehouses.map((w, i) => (
-              <WarehouseTiltCard key={w.id} warehouse={w} index={i} />
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="sticky top-0 z-10 bg-slate-50">
+              <tr className="border-b border-slate-100">
+                <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase">Facility Details</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase">Utilization</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase">Rate</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {warehouses.map((w) => (
+                <tr key={w.id} className="hover:bg-slate-50/30 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-100">
+                        <Home className="h-4 w-4 text-indigo-500" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-bold text-slate-900 leading-none">{w.name}</p>
+                        <p className="text-[10px] text-slate-400 font-medium truncate max-w-[180px]">{w.address}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="w-40 space-y-1.5">
+                      <div className="flex items-center justify-between text-[9px] font-bold uppercase">
+                        <span className="text-slate-400">{w.availableCapacity} MT Free</span>
+                        <span className="text-indigo-600">{Math.round((w.availableCapacity / w.totalCapacity) * 100)}%</span>
+                      </div>
+                      <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-indigo-600" 
+                          style={{ width: `${(w.availableCapacity / w.totalCapacity) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm font-bold text-slate-900">₹{w.pricing}</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">/ MT</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[9px] font-bold uppercase tracking-tight",
+                      w.status === 'APPROVED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100"
+                    )}>
+                      <ShieldCheck className="h-3 w-3" />
+                      {w.status === 'APPROVED' ? 'LIVE' : 'PENDING'}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

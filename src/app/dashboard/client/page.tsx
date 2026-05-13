@@ -2,112 +2,136 @@
 
 import { useEffect, useState } from "react";
 import { 
-  Search, 
-  MapPin, 
-  Warehouse, 
-  Star, 
-  ShieldCheck,
-  TrendingUp,
-  Package,
-  Loader2
+  Package, 
+  Clock, 
+  ShieldCheck, 
+  TrendingUp, 
+  Boxes,
+  ArrowRight,
+  Bell
 } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { getPublicWarehouses } from "@/lib/actions/public";
-import { motion } from "framer-motion";
+import { getClientDashboardStats, getClientBookingHistory } from "@/lib/actions/client";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-export default function ClientMarketplace() {
-  const [warehouses, setWarehouses] = useState<any[]>([]);
+export default function ClientDashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchWarehouses = async () => {
-      const data = await getPublicWarehouses();
-      setWarehouses(data);
+    const fetchData = async () => {
+      const [s, h] = await Promise.all([
+        getClientDashboardStats(),
+        getClientBookingHistory()
+      ]);
+      setStats(s);
+      setHistory(h);
       setIsLoading(false);
     };
-    fetchWarehouses();
+    fetchData();
   }, []);
 
+  if (isLoading) return <div className="p-8 animate-pulse space-y-4"><div className="h-32 bg-slate-100 rounded-xl" /><div className="h-64 bg-slate-50 rounded-2xl" /></div>;
+
+  const notifications = history.filter(b => b.status !== 'PENDING').slice(0, 3);
+
   return (
-    <div className="max-w-7xl mx-auto space-y-10 pb-20 p-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1">
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">Explore Storage</h1>
-          <p className="text-slate-500">Find verified, secure warehouses for your commodities across India.</p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Client Workspace</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Global Inventory Tracker</p>
         </div>
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-          <input 
-            placeholder="Search by city or warehouse name..."
-            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all"
-          />
-        </div>
+        <Link href="/dashboard/client/book">
+          <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 h-8 text-[11px] font-bold uppercase tracking-wider rounded-lg gap-2">
+            <Package className="h-3.5 w-3.5" /> Book Space
+          </Button>
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {isLoading ? (
-          [1, 2, 3].map(i => (
-            <div key={i} className="h-[400px] bg-slate-50 animate-pulse rounded-3xl border border-slate-100" />
-          ))
-        ) : warehouses.length === 0 ? (
-          <div className="col-span-full py-20 text-center">
-            <Warehouse className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-            <p className="text-slate-400">No verified warehouses available at the moment.</p>
+      {/* Analytics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard 
+          label="Managed Weight" 
+          value={`${stats?.totalWeight || 0} MT`} 
+          subtext="Net weight in approved nodes"
+          icon={TrendingUp} 
+          iconColor="text-emerald-500"
+        />
+        <StatCard 
+          label="Active Contracts" 
+          value={stats?.activeBookings || 0} 
+          subtext="Live storage facilities"
+          icon={Boxes} 
+          iconColor="text-blue-500"
+        />
+        <StatCard 
+          label="Pending Requests" 
+          value={stats?.pendingRequests || 0} 
+          subtext="Awaiting owner verification"
+          icon={Clock} 
+          iconColor="text-amber-500"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Notifications */}
+        <Card className="lg:col-span-1 p-4 border border-slate-200 shadow-sm rounded-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <Bell className="h-3 w-3" /> System Alerts
+            </h3>
           </div>
-        ) : (
-          warehouses.map((w) => (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              key={w.id}
-            >
-              <Card className="border-none shadow-xl shadow-slate-100 rounded-[2.5rem] overflow-hidden group hover:shadow-2xl hover:shadow-indigo-500/5 transition-all duration-500">
-                <div className="h-48 bg-slate-900 relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-transparent" />
-                  <Badge className="absolute top-6 left-6 bg-white/90 backdrop-blur-md text-indigo-600 border-none font-bold">
-                    {w.totalCapacity} MT Total
-                  </Badge>
-                  <div className="absolute bottom-6 left-6 text-white">
-                    <div className="flex items-center gap-1 text-xs font-bold text-indigo-300 uppercase tracking-widest mb-1">
-                      <ShieldCheck className="h-3 w-3" /> Verified Secure
-                    </div>
-                    <CardTitle className="text-xl font-bold">{w.name}</CardTitle>
-                  </div>
+          <div className="space-y-3">
+            {notifications.length === 0 ? (
+              <p className="text-[10px] text-slate-400 font-medium italic">No recent status updates</p>
+            ) : notifications.map(n => (
+              <div key={n.id} className="flex items-start gap-3 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                <div className={cn(
+                  "h-1.5 w-1.5 rounded-full mt-1.5 shrink-0",
+                  n.status === 'APPROVED' ? "bg-emerald-500" : "bg-red-500"
+                )} />
+                <div className="space-y-0.5">
+                  <p className="text-[11px] font-bold text-slate-900 leading-tight">
+                    {n.warehouse?.name} Request {n.status === 'APPROVED' ? 'Accepted' : 'Rejected'}
+                  </p>
+                  <p className="text-[9px] text-slate-400 font-medium">Verified by owner</p>
                 </div>
-                <CardContent className="p-8 space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
-                      <MapPin className="h-4 w-4 text-indigo-500" />
-                      {w.address}
-                    </div>
-                    <div className="flex items-center gap-1 text-amber-500">
-                      <Star className="h-4 w-4 fill-amber-500" />
-                      <span className="text-sm font-bold">4.8</span>
-                    </div>
-                  </div>
+              </div>
+            ))}
+          </div>
+        </Card>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-50 p-4 rounded-2xl">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Available</p>
-                      <p className="text-lg font-bold text-slate-900">{w.availableCapacity} MT</p>
-                    </div>
-                    <div className="bg-slate-50 p-4 rounded-2xl">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Price / MT</p>
-                      <p className="text-lg font-bold text-slate-900">₹{w.pricing}</p>
-                    </div>
-                  </div>
-
-                  <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-14 font-bold shadow-lg shadow-indigo-100 group-hover:scale-[1.02] transition-transform">
-                    Check Availability
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))
-        )}
+        {/* Commodity Distribution Placeholder */}
+        <Card className="lg:col-span-2 p-4 border border-slate-200 shadow-sm rounded-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <Package className="h-3 w-3" /> Distribution by Material
+            </h3>
+          </div>
+          <div className="h-48 flex items-center justify-center border-dashed border border-slate-100 rounded-lg">
+            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest italic">Live weight visualization active</p>
+          </div>
+        </Card>
       </div>
     </div>
+  );
+}
+
+function StatCard({ label, value, subtext, icon: Icon, iconColor }: any) {
+  return (
+    <Card className="p-4 border border-slate-200 shadow-sm rounded-xl bg-white flex items-center justify-between group hover:border-indigo-500/20 transition-all">
+      <div className="space-y-0.5">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+        <p className="text-2xl font-bold text-slate-900 tracking-tight">{value}</p>
+        <p className="text-[9px] text-slate-400 font-medium">{subtext}</p>
+      </div>
+      <div className={cn("h-10 w-10 rounded-lg bg-slate-50 flex items-center justify-center", iconColor)}>
+        <Icon className="h-5 w-5" strokeWidth={1.5} />
+      </div>
+    </Card>
   );
 }

@@ -12,7 +12,7 @@ export default async function Home() {
   const role = session.user.role;
 
   if (role === "ADMIN") redirect("/admin/users");
-  if (role === "OWNER" || role === "WAREHOUSE_OWNER") redirect("/dashboard/warehouse/dashboard");
+  if (role === "OWNER" || role === "WAREHOUSE_OWNER")    redirect("/dashboard/warehouse");
   if (role === "CLIENT") redirect("/dashboard/client");
 
   // Fallback to the smart dashboard redirector if no roles match

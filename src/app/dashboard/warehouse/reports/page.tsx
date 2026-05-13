@@ -2,177 +2,211 @@
 
 import { useEffect, useState } from "react";
 import { 
-  BarChart3, 
+  Download, 
   Search, 
   Filter, 
-  Download,
   Calendar,
   ArrowUpRight,
   User as UserIcon,
   Warehouse as WarehouseIcon,
-  Tag,
-  ExternalLink
+  ExternalLink,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getOwnerBookings } from "@/lib/actions/booking";
+import { cn } from "@/lib/utils";
 
-export default function ReportsPage() {
+export default function SafeReportsPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetchHistory = async () => {
-      const data = await getOwnerBookings();
-      setHistory(data.filter(b => b.status === 'APPROVED'));
-      setIsLoading(false);
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await getOwnerBookings();
+        // Safe filter: Ensure booking exists and has a warehouse before processing
+        setHistory(Array.isArray(data) ? data.filter(b => b?.status === 'APPROVED') : []);
+      } catch (err) {
+        console.error("Reports Load Failure:", err);
+        setError("Failed to stream ledger data. Please check connectivity.");
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchHistory();
   }, []);
 
-  const totalWeight = history.reduce((sum, b) => sum + (b.weight || 0), 0);
+  // Safe Reduce: Handle null weights or empty history
+  const totalWeight = history.reduce((sum, b) => sum + (Number(b?.weight) || 0), 0);
 
-  const filteredHistory = history.filter(b => 
-    b.warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (b.client?.name || b.manualClientName || "").toLowerCase().includes(searchTerm.toLowerCase())
+  // Safe Filter: Multi-level null checks for warehouse and client names
+  const filteredHistory = history.filter(b => {
+    const search = searchTerm.toLowerCase();
+    const warehouseName = b?.warehouse?.name?.toLowerCase() || "";
+    const clientName = (b?.client?.name || b?.manualClientName || "").toLowerCase();
+    const commodity = (b?.commodityType || "").toLowerCase();
+    return warehouseName.includes(search) || clientName.includes(search) || commodity.includes(search);
+  });
+
+  if (error) return (
+    <div className="h-64 flex flex-col items-center justify-center space-y-4 border border-red-100 bg-red-50/30 rounded-xl">
+      <AlertCircle className="h-8 w-8 text-red-500" />
+      <div className="text-center">
+        <p className="text-sm font-bold text-red-900 uppercase tracking-tight">{error}</p>
+        <Button variant="link" onClick={() => window.location.reload()} className="text-xs text-red-600 font-bold uppercase">Retry Handshake</Button>
+      </div>
+    </div>
   );
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Operational Ledger</h1>
-          <p className="text-slate-500">Weight-based historical record (MT) of all active storage contracts.</p>
+    <div className="space-y-4 pb-12">
+      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div className="space-y-0.5">
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight">Operational Ledger</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Weight-based historical record (MT)</p>
         </div>
-        <Button variant="outline" className="rounded-xl gap-2 border-slate-200">
-          <Download className="h-4 w-4" /> Export CSV
+        <Button variant="outline" size="sm" className="rounded-lg gap-2 border-slate-200 h-9 text-[11px] font-bold">
+          <Download className="h-3.5 w-3.5" /> Export CSV
         </Button>
       </div>
 
       {/* Summary Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Bookings</p>
-          <div className="text-3xl font-bold text-slate-900">{history.length}</div>
-          <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold mt-1">
-            <ArrowUpRight className="h-3 w-3" /> All Time
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Weight Handled</p>
-          <div className="text-3xl font-bold text-slate-900">{totalWeight.toLocaleString()} MT</div>
-          <p className="text-xs text-slate-400 mt-1">Across all contracts</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Entry distribution</p>
-          <div className="text-xl font-bold text-slate-900">
-            {history.filter(b => b.bookingType === 'MANUAL').length} Manual / {history.filter(b => b.bookingType === 'PLATFORM').length} App
-          </div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SummaryCard 
+          label="Total Bookings" 
+          value={history.length} 
+          subtext="Approved Records" 
+          icon={<ArrowUpRight className="h-3 w-3 text-emerald-600" />}
+        />
+        <SummaryCard 
+          label="Total Weight" 
+          value={`${totalWeight.toLocaleString()} MT`} 
+          subtext="Net Handled" 
+        />
+        <SummaryCard 
+          label="Entry Source" 
+          value={`${history.filter(b => b?.bookingType === 'MANUAL').length}M / ${history.filter(b => b?.bookingType === 'PLATFORM').length}A`} 
+          subtext="Manual vs App" 
+        />
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-2 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+      <div className="bg-white border border-slate-200 rounded-xl p-1.5 flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input 
-            placeholder="Search client, warehouse or commodity..."
+            placeholder="Search ledger..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50/50 border-none rounded-xl text-sm outline-none"
+            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border-none rounded-lg text-xs outline-none font-medium"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="gap-2 text-slate-500 rounded-xl">
-            <Calendar className="h-4 w-4" /> Date Range
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-slate-500 rounded-lg text-[10px] font-bold uppercase h-8">
+            <Calendar className="h-3.5 w-3.5" /> Range
           </Button>
-          <div className="h-4 w-px bg-slate-100 mx-2" />
-          <Button variant="ghost" size="sm" className="gap-2 text-slate-500 rounded-xl">
-            <Filter className="h-4 w-4" /> Commodity
+          <div className="h-3 w-px bg-slate-100 mx-1" />
+          <Button variant="ghost" size="sm" className="gap-1.5 text-slate-500 rounded-lg text-[10px] font-bold uppercase h-8">
+            <Filter className="h-3.5 w-3.5" /> Type
           </Button>
         </div>
       </div>
 
       {/* Main Ledger Table */}
-      <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50/50 border-b border-slate-100">
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">Date</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">Client</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">Warehouse</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">Commodity</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">Weight</th>
-              <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase">Source</th>
-              <th className="px-6 py-4"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {isLoading ? (
-              [1, 2, 3].map(i => (
-                <tr key={i} className="animate-pulse">
-                  <td colSpan={7} className="px-6 py-8">
-                    <div className="h-4 bg-slate-50 rounded w-full" />
-                  </td>
-                </tr>
-              ))
-            ) : filteredHistory.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-6 py-20 text-center text-slate-400 text-sm">
-                  No records found matching your filters.
-                </td>
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50">
+              <tr className="border-b border-slate-100">
+                <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase">Date</th>
+                <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase">Client</th>
+                <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase">Warehouse</th>
+                <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase">Material</th>
+                <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase">Weight</th>
+                <th className="px-4 py-2 text-[9px] font-bold text-slate-400 uppercase">Source</th>
+                <th className="px-4 py-2"></th>
               </tr>
-            ) : (
-              filteredHistory.map((booking) => (
-                <tr key={booking.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {new Date(booking.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-full bg-indigo-50 flex items-center justify-center">
-                        <UserIcon className="h-3.5 w-3.5 text-indigo-500" />
-                      </div>
-                      <span className="text-sm font-semibold text-slate-900">
-                        {booking.client?.name || booking.manualClientName}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                      <WarehouseIcon className="h-3.5 w-3.5 text-slate-400" />
-                      {booking.warehouse.name}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 max-w-[200px]">
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-700 truncate">
-                      <Tag className="h-3 w-3 text-slate-400 shrink-0" />
-                      {booking.commodityType || "Other"}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-bold text-indigo-600">
-                    {booking.weight} MT
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge 
-                      className={booking.bookingType === 'MANUAL' ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-indigo-50 text-indigo-600 border-indigo-100"}
-                      variant="outline"
-                    >
-                      {booking.bookingType}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="h-8 w-8 rounded-lg hover:bg-white border border-transparent hover:border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all">
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </button>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {isLoading ? (
+                [1, 2, 3, 4].map(i => (
+                  <tr key={i} className="animate-pulse">
+                    <td colSpan={7} className="px-4 py-3"><div className="h-3 bg-slate-50 rounded w-full" /></td>
+                  </tr>
+                ))
+              ) : filteredHistory.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-400 text-[10px] font-bold uppercase italic">
+                    No matching logistics records found
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filteredHistory.map((booking) => (
+                  <tr key={booking?.id} className="hover:bg-slate-50/30 transition-colors group">
+                    <td className="px-4 py-2.5 text-xs text-slate-500">
+                      {booking?.createdAt ? new Date(booking.createdAt).toLocaleDateString() : "N/A"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                          <UserIcon className="h-3 w-3 text-slate-400" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-900">
+                          {booking?.client?.name || booking?.manualClientName || "Direct Client"}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500 font-medium">
+                      {booking?.warehouse?.name || "Unassigned Node"}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-slate-500 font-medium truncate max-w-[150px]">
+                      {booking?.commodityType || "Other"}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs font-bold text-indigo-600">
+                      {booking?.weight ?? 0} MT
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Badge 
+                        className={cn(
+                          "text-[8px] font-black uppercase px-2 py-0.5 rounded-md border",
+                          booking?.bookingType === 'MANUAL' ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-indigo-50 text-indigo-600 border-indigo-100"
+                        )}
+                        variant="outline"
+                      >
+                        {booking?.bookingType || "PLATFORM"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <button className="h-6 w-6 rounded hover:bg-white border border-transparent hover:border-slate-200 flex items-center justify-center text-slate-300 hover:text-slate-900 transition-all">
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value, subtext, icon }: any) {
+  return (
+    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
+      <div className="flex items-center gap-2">
+        <div className="text-xl font-bold text-slate-900">{value}</div>
+        {icon}
+      </div>
+      <p className="text-[10px] text-slate-400 font-medium">{subtext}</p>
     </div>
   );
 }

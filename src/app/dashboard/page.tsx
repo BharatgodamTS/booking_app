@@ -14,7 +14,7 @@ export default async function DashboardRootPage() {
   if (role === "ADMIN") {
     redirect("/admin/users");
   } else if (role === "OWNER" || role === "WAREHOUSE_OWNER") {
-    redirect("/dashboard/warehouse/dashboard");
+    redirect("/dashboard/warehouse");
   } else if (role === "CLIENT") {
     redirect("/dashboard/client");
   } else {

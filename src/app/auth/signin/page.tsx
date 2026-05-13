@@ -7,6 +7,7 @@ import * as z from "zod";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { LayoutDashboard, Lock, Mail, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -16,6 +17,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function SignInPage() {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -35,16 +37,20 @@ export default function SignInPage() {
       const result = await signIn("credentials", {
         email: data.email,
         password: data.password,
-        redirect: true,
-        callbackUrl: "/",
+        redirect: false, // Handle manually
       });
 
-      if (result?.error) {
+      if (result?.ok) {
+        // Redirection logic is also handled in auth.ts, 
+        // but explicit push ensures client-side transitions.
+        router.push("/dashboard/warehouse");
+        router.refresh();
+      } else if (result?.error) {
         setError("Invalid email or password");
+        setIsLoading(false);
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
-    } finally {
       setIsLoading(false);
     }
   };
