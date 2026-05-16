@@ -161,7 +161,7 @@ export async function getOwnerBookings(status?: string) {
           select: { name: true, email: true, phone: true }
         },
         warehouse: {
-          select: { name: true, location: true }
+          select: { name: true, address: true }
         }
       },
       orderBy: { createdAt: 'desc' }

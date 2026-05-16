@@ -2,21 +2,17 @@ import { z } from "zod";
 
 export const warehouseSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
-  location: z.string().min(5, "Location is required"),
-  totalCapacity: z.coerce.number().positive("Capacity must be greater than 0"),
+  address: z.string().min(5, "Full address specification required"),
+  totalCapacity: z.coerce.number().positive("Total capacity must be a positive metric tonnage"),
 });
 
 export const bookingSchema = z.object({
   warehouseId: z.string().cuid(),
-  volume: z.coerce.number().positive("Volume must be greater than 0"),
-  startDate: z.date({
-    required_error: "Start date is required",
-  }),
-  endDate: z.date({
-    required_error: "End date is required",
-  }),
+  volume: z.coerce.number().positive("Operational volume must be greater than zero"),
+  startDate: z.date(),
+  endDate: z.date(),
 }).refine((data) => data.endDate > data.startDate, {
-  message: "End date must be after start date",
+  message: "Operational window error: End date must follow start date",
   path: ["endDate"],
 });
 

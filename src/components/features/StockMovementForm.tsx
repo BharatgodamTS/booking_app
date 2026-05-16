@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { 
@@ -14,7 +14,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { recordStockMovement } from "@/lib/actions/logistics";
@@ -33,7 +34,16 @@ const schema = z.object({
   partyName: z.string().min(2, "Party Name is required"),
 });
 
-type FormValues = z.infer<typeof schema>;
+interface FormValues {
+  warehouseId: string;
+  type: 'INBOUND' | 'OUTBOUND';
+  commodity: string;
+  weight: number;
+  truckNumber: string;
+  driverName: string;
+  biltyNumber: string;
+  partyName: string;
+}
 
 export function StockMovementForm({ 
   warehouseId, 
@@ -47,14 +57,14 @@ export function StockMovementForm({
   const [movementType, setMovementType] = useState<'INBOUND' | 'OUTBOUND'>('INBOUND');
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       warehouseId: warehouseId || warehouses[0]?.id,
       type: 'INBOUND'
     }
   });
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit: SubmitHandler<FormValues> = async (data) => {
     const result = await recordStockMovement({ ...data, type: movementType });
     if (result.success) {
       toast.success(`${movementType} Entry Recorded Successfully`);
@@ -66,7 +76,7 @@ export function StockMovementForm({
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-8">
       {/* Transaction Type Selector */}
       <div className="grid grid-cols-2 gap-4">
         {[

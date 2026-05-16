@@ -17,7 +17,8 @@ import {
   MapPin,
   Phone,
   Mail,
-  Loader2
+  Loader2,
+  ShieldCheck
 } from "lucide-react";
 import { 
   Dialog, 

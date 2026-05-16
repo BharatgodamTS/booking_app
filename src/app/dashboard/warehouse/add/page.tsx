@@ -1,11 +1,11 @@
 'use client';
 
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import { createWarehouse } from "@/lib/actions/warehouse";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { 
+  Plus, 
+  Warehouse as WarehouseIcon, 
+  ClipboardList,
+  ArrowRight
+} from "lucide-react";
 import { 
   Card, 
   CardContent, 
@@ -14,265 +14,82 @@ import {
   CardDescription 
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { 
-  Plus, 
-  Warehouse as WarehouseIcon, 
-  MapPin, 
-  Maximize, 
-  IndianRupee,
-  CheckCircle2,
-  AlertCircle,
-  ClipboardList
-} from "lucide-react";
-
-// Client-side validation schema
-const warehouseSchema = z.object({
-  name: z.string().min(3, "Name must be at least 3 characters"),
-  address: z.string().min(10, "Full address is required"),
-  totalCapacity: z.coerce.number().min(1, "Total capacity must be positive"),
-  availableCapacity: z.coerce.number().min(0),
-  pricing: z.coerce.number().min(0, "Pricing is required"),
-  features: z.array(z.string()).min(1, "Select at least one feature"),
-}).refine((data) => data.availableCapacity <= data.totalCapacity, {
-  message: "Available capacity cannot exceed total capacity",
-  path: ["availableCapacity"],
-});
-
-type WarehouseFormValues = z.infer<typeof warehouseSchema>;
+import WarehouseForm from "@/components/features/WarehouseForm";
+import Link from "next/link";
 
 export default function WarehouseManagementPage() {
-  const router = useRouter();
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<WarehouseFormValues>({
-    resolver: zodResolver(warehouseSchema),
-    defaultValues: {
-      features: [],
-    }
-  });
-
-  const selectedFeatures = watch("features");
-
-  const toggleFeature = (feature: string) => {
-    const current = selectedFeatures;
-    if (current.includes(feature)) {
-      setValue("features", current.filter(f => f !== feature));
-    } else {
-      setValue("features", [...current, feature]);
-    }
-  };
-
-  const onSubmit = async (data: WarehouseFormValues) => {
-    try {
-      const result = await createWarehouse(data);
-      if (result.success) {
-        toast.success("Warehouse registered successfully!");
-        reset();
-      } else {
-        toast.error(result.error || "Failed to register warehouse");
-      }
-    } catch (err) {
-      toast.error("An unexpected error occurred");
-    }
-  };
-
   return (
     <div className="space-y-8 pb-10">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Warehouse Management</h1>
-        <p className="text-slate-500">Register and manage your storage facilities in one place.</p>
+      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+        <div className="space-y-0.5">
+          <h1 className="text-xl font-black text-slate-900 tracking-tight italic">Facility <span className="text-slate-400 font-normal not-italic">Registry</span></h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Network Expansion Hub</p>
+        </div>
+        <Link href="/dashboard/warehouse">
+          <Button variant="outline" className="h-9 text-[10px] font-black uppercase tracking-widest border-slate-200 rounded-xl gap-2">
+            Command Center <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-8">
-        {/* Top Section: Registration Form */}
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <Plus className="h-5 w-5 text-indigo-600" />
-              Register New Warehouse
+        {/* Top Section: Registration Hub */}
+        <Card className="border-slate-200 shadow-sm bg-slate-50/50 rounded-3xl overflow-hidden">
+          <CardHeader className="bg-white border-b border-slate-100">
+            <CardTitle className="text-xl flex items-center gap-2 uppercase tracking-tight font-black italic">
+              <div className="h-10 w-10 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-900/20">
+                <Plus className="h-5 w-5 text-white" />
+              </div>
+              Expansion <span className="text-indigo-600">Terminal</span>
             </CardTitle>
-            <CardDescription>Enter the technical and pricing details of your storage facility.</CardDescription>
+            <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Add high-capacity storage nodes to the BharatGodam network.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Name */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Warehouse Name</label>
-                  <div className="relative">
-                    <WarehouseIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      {...register("name")}
-                      placeholder="e.g. Central Metro Storage"
-                      className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                    />
-                  </div>
-                  {errors.name && <p className="text-xs text-rose-500 font-medium">{errors.name.message}</p>}
-                </div>
-
-                {/* Pricing */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Pricing (per month)</label>
-                  <div className="relative">
-                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      {...register("pricing")}
-                      type="number"
-                      placeholder="5000"
-                      className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                    />
-                  </div>
-                  {errors.pricing && <p className="text-xs text-rose-500 font-medium">{errors.pricing.message}</p>}
-                </div>
-
-                {/* Address - Full width */}
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700">Full Address</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                    <textarea
-                      {...register("address")}
-                      rows={3}
-                      placeholder="Detailed location including city, state, and pin code"
-                      className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none"
-                    />
-                  </div>
-                  {errors.address && <p className="text-xs text-rose-500 font-medium">{errors.address.message}</p>}
-                </div>
-
-                {/* Total Capacity */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Total Capacity (sq. ft.)</label>
-                  <div className="relative">
-                    <Maximize className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      {...register("totalCapacity")}
-                      type="number"
-                      placeholder="10000"
-                      className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                    />
-                  </div>
-                  {errors.totalCapacity && <p className="text-xs text-rose-500 font-medium">{errors.totalCapacity.message}</p>}
-                </div>
-
-                {/* Available Capacity */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">Currently Available</label>
-                  <div className="relative">
-                    <CheckCircle2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      {...register("availableCapacity")}
-                      type="number"
-                      placeholder="10000"
-                      className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                    />
-                  </div>
-                  {errors.availableCapacity && <p className="text-xs text-rose-500 font-medium">{errors.availableCapacity.message}</p>}
-                </div>
-
-                {/* Features Multi-select */}
-                <div className="space-y-3 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700">Available Features</label>
-                  <div className="flex flex-wrap gap-2">
-                    {["Cold Storage", "CCTV", "24/7 Access", "Loading Dock", "Fire Safety"].map((feature) => (
-                      <button
-                        key={feature}
-                        type="button"
-                        onClick={() => toggleFeature(feature)}
-                        className={cn(
-                          "px-4 py-2 rounded-full text-xs font-medium border transition-all",
-                          selectedFeatures.includes(feature)
-                            ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100"
-                            : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300"
-                        )}
-                      >
-                        {feature}
-                      </button>
-                    ))}
-                  </div>
-                  {errors.features && <p className="text-xs text-rose-500 font-medium">{errors.features.message}</p>}
-                </div>
+          <CardContent className="p-12 text-center space-y-6">
+            <div className="max-w-md mx-auto space-y-4">
+              <div className="h-20 w-20 bg-white rounded-[2rem] flex items-center justify-center mx-auto border border-slate-200 shadow-sm">
+                <WarehouseIcon className="h-8 w-8 text-indigo-600" />
               </div>
-
-              <div className="flex justify-end pt-4">
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  className="bg-indigo-600 hover:bg-indigo-700 px-8"
-                >
-                  {isSubmitting ? "Registering..." : "Add Warehouse"}
-                </Button>
+              <div className="space-y-1">
+                <h3 className="text-lg font-black uppercase tracking-tight text-slate-900">Facility Registration Protocol</h3>
+                <p className="text-xs font-bold text-slate-400 leading-relaxed uppercase tracking-widest">Capture full industrial metadata including WDRA status and GST credentials for administrative verification.</p>
               </div>
-            </form>
+            </div>
+            
+            <div className="flex justify-center">
+              <WarehouseForm 
+                trigger={
+                  <Button className="bg-[#0f172a] hover:bg-slate-800 text-white font-black text-xs uppercase tracking-[0.2em] h-14 px-12 rounded-2xl shadow-2xl shadow-slate-900/40 transition-all active:scale-95">
+                    Launch Registration Wizard
+                  </Button>
+                }
+              />
+            </div>
           </CardContent>
         </Card>
 
-        {/* Bottom Section: Inventory List */}
-        <WarehouseList />
+        {/* Bottom Section: Network Inventory */}
+        <Card className="border-slate-200 shadow-sm overflow-hidden rounded-3xl">
+          <CardHeader className="bg-slate-900 text-white border-b border-slate-800">
+            <CardTitle className="text-xl flex items-center gap-2 uppercase tracking-tight font-black italic">
+              <ClipboardList className="h-5 w-5 text-indigo-400" />
+              Operational <span className="text-indigo-400 font-normal not-italic">Nodes</span>
+            </CardTitle>
+            <CardDescription className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Live status of your industrial storage inventory.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="p-20 text-center space-y-3 bg-slate-50/50">
+               <div className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] italic">
+                 Node data synchronized with Command Center
+               </div>
+               <Link href="/dashboard/warehouse">
+                  <Button variant="link" className="text-indigo-600 font-black text-[10px] uppercase tracking-widest">
+                    Manage all nodes in Command Center
+                  </Button>
+               </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
-  );
-}
-
-// Helper component for the table
-function WarehouseList() {
-  // In a real app, this would be a server component or use SWR/React Query
-  // For this demonstration, we'll assume it's integrated or use a placeholder
-  return (
-    <Card className="border-slate-200 shadow-sm overflow-hidden">
-      <CardHeader className="bg-slate-50/50">
-        <CardTitle className="text-xl flex items-center gap-2">
-          <ClipboardList className="h-5 w-5 text-slate-600" />
-          Your Warehouse Inventory
-        </CardTitle>
-        <CardDescription>Overview of all storage facilities registered under your account.</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 border-y border-slate-100 text-slate-500 font-medium">
-              <tr>
-                <th className="px-6 py-3">Warehouse Details</th>
-                <th className="px-6 py-3">Capacity (Avail / Total)</th>
-                <th className="px-6 py-3">Pricing</th>
-                <th className="px-6 py-3">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              <tr className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="font-semibold text-slate-900">Metro Hub A1</div>
-                  <div className="text-xs text-slate-500 truncate max-w-[200px]">Sector 62, Noida, UP - 201301</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="bg-indigo-600 h-full w-[70%]" />
-                    </div>
-                    <span className="text-xs font-medium text-slate-700">7,000 / 10,000</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 font-medium text-slate-900">₹8,500/mo</td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
-                    Active
-                  </span>
-                </td>
-              </tr>
-              {/* Empty state placeholder if no data */}
-              <tr className="h-32 text-center text-slate-400">
-                <td colSpan={4}>Loading your inventory...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
