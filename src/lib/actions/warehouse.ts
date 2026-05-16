@@ -8,9 +8,15 @@ import { revalidatePath } from "next/cache";
 export async function createWarehouse(data: {
   name: string;
   address: string;
+  area: number;
   totalCapacity: number;
-  availableCapacity: number;
   pricing: number;
+  storageType: string;
+  availableFrom: string;
+  materialsAllowed: string;
+  wdraStatus: boolean;
+  gstNumber: string;
+  images?: string;
   features: string[];
 }) {
   try {
@@ -20,67 +26,79 @@ export async function createWarehouse(data: {
       return { success: false, error: "Unauthorized. Please sign in." };
     }
 
-    if (session.user.role !== "OWNER" && session.user.role !== "WAREHOUSE_OWNER" && session.user.role !== "ADMIN") {
-      return { success: false, error: "Forbidden. Only owners can register warehouses." };
-    }
-
-    // [SELF-REPAIR] If using mock session, ensure DB record exists to prevent P2003 error
-    if (session.user.id === "mock-id-123") {
-      await prisma.user.upsert({
-        where: { id: "mock-id-123" },
-        update: { role: "OWNER" },
-        create: {
-          id: "mock-id-123",
-          email: session.user.email || "test@bharatgodam.com",
-          name: session.user.name || "Test Owner",
-          password: "password123",
-          role: "OWNER",
-        },
-      });
-    }
-
     const warehouse = await prisma.warehouse.create({
       data: {
         name: data.name,
         address: data.address,
+        area: data.area,
         totalCapacity: data.totalCapacity,
-        availableCapacity: data.availableCapacity,
+        availableCapacity: data.totalCapacity, // Initially full capacity available
         pricing: data.pricing,
+        storageType: data.storageType,
+        availableFrom: new Date(data.availableFrom),
+        materialsAllowed: data.materialsAllowed,
+        wdraStatus: data.wdraStatus,
+        gstNumber: data.gstNumber,
+        images: data.images || "",
         features: data.features.join(","),
         ownerId: session.user.id,
+        status: "PENDING"
       },
     });
 
     revalidatePath('/dashboard/warehouse');
-    revalidatePath('/dashboard/warehouse/warehouses');
-
     return { success: true, data: warehouse };
-  } catch (error) {
+  } catch (error: any) {
     console.error("[CREATE_WAREHOUSE_ERROR]", error);
-    return { success: false, error: "Failed to create warehouse record." };
+    return { success: false, error: error.message || "Failed to create warehouse record." };
+  }
+}
+
+export async function updateWarehouse(id: string, data: {
+  name: string;
+  address: string;
+  area: number;
+  totalCapacity: number;
+  pricing: number;
+  storageType: string;
+  availableFrom: string;
+  materialsAllowed: string;
+  wdraStatus: boolean;
+  gstNumber: string;
+  images?: string;
+  features: string[];
+}) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
+    const warehouse = await prisma.warehouse.update({
+      where: { id },
+      data: {
+        ...data,
+        availableFrom: new Date(data.availableFrom),
+        features: data.features.join(","),
+        status: "PENDING"
+      }
+    });
+
+    revalidatePath('/dashboard/warehouse');
+    return { success: true, data: warehouse };
+  } catch (error: any) {
+    console.error("[UPDATE_WAREHOUSE_ERROR]", error);
+    return { success: false, error: "Update failed" };
   }
 }
 
 export async function getOwnerWarehouses() {
   try {
-    console.log("🔍 [LOGISTICS] Fetching owner warehouses...");
     const session = await getServerSession(authOptions);
-    console.log("👤 [LOGISTICS] Session retrieved for role:", session?.user?.role);
-
-    if (!session?.user?.id) {
-      console.warn("⚠️ [LOGISTICS] No user ID found in session.");
-      return [];
-    }
+    if (!session?.user?.id) return [];
 
     const warehouses = await prisma.warehouse.findMany({
-      where: {
-        ownerId: session.user.id,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      where: { ownerId: session.user.id },
+      orderBy: { createdAt: 'desc' }
     });
-    console.log(`✅ [LOGISTICS] Successfully retrieved ${warehouses.length} warehouses.`);
 
     return warehouses.map(w => ({
       ...w,
@@ -124,5 +142,73 @@ export async function getDashboardStats() {
   } catch (error) {
     console.error("[GET_LOGISTICS_STATS_ERROR]", error);
     return { totalTransactions: 0, currentInventory: 0, activeWarehouses: 0, pendingRequests: 0 };
+  }
+}
+
+// 📦 BOOKING MANAGEMENT ACTIONS
+export async function getOwnerBookings(status?: string) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return [];
+
+    return await prisma.booking.findMany({
+      where: {
+        warehouse: { ownerId: session.user.id },
+        ...(status ? { status } : {})
+      },
+      include: {
+        client: {
+          select: { name: true, email: true, phone: true }
+        },
+        warehouse: {
+          select: { name: true, location: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  } catch (error) {
+    console.error("[GET_OWNER_BOOKINGS_ERROR]", error);
+    return [];
+  }
+}
+
+export async function updateBookingStatus(bookingId: string, status: 'APPROVED' | 'REJECTED') {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { warehouse: true }
+    });
+
+    if (!booking) return { success: false, error: "Booking not found" };
+
+    // 🛡️ ATOMIC STATUS UPDATE
+    await prisma.$transaction(async (tx) => {
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: { status }
+      });
+
+      // If approved, decrement available capacity
+      if (status === 'APPROVED') {
+        await tx.warehouse.update({
+          where: { id: booking.warehouseId },
+          data: {
+            availableCapacity: {
+              decrement: booking.weight
+            }
+          }
+        });
+      }
+    });
+
+    revalidatePath('/dashboard/warehouse');
+    revalidatePath('/dashboard/warehouse/reports');
+    return { success: true };
+  } catch (error: any) {
+    console.error("[UPDATE_BOOKING_STATUS_ERROR]", error);
+    return { success: false, error: "Failed to update booking status" };
   }
 }

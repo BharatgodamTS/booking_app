@@ -1,305 +1,269 @@
 "use client";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { toast } from "sonner";
-import { createWarehouse } from "@/lib/actions/warehouse";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect } from "react";
 import { 
-  Warehouse as WarehouseIcon, 
+  Building2, 
   MapPin, 
   Maximize, 
-  IndianRupee,
-  Shield,
-  Snowflake,
-  Clock,
+  Weight, 
+  IndianRupee, 
+  Calendar,
+  Package,
+  ShieldCheck,
+  FileText,
+  ImageIcon,
   Loader2,
-  ChevronRight,
-  ChevronLeft,
-  CheckCircle2,
-  Sparkles
+  AlertCircle,
+  Plus,
+  X,
+  Info
 } from "lucide-react";
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogDescription
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { createWarehouse, updateWarehouse } from "@/lib/actions/warehouse";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-const warehouseSchema = z.object({
-  name: z.string().min(3, "Name must be at least 3 characters"),
-  address: z.string().min(10, "Full address is required"),
-  totalCapacity: z.coerce.number().min(1, "Total capacity must be positive"),
-  availableCapacity: z.coerce.number().min(0),
-  pricing: z.coerce.number().min(0, "Pricing is required"),
-  features: z.array(z.string()).min(1, "Select at least one feature"),
-}).refine((data) => data.availableCapacity <= data.totalCapacity, {
-  message: "Available capacity cannot exceed total capacity",
-  path: ["availableCapacity"],
-});
+interface WarehouseFormProps {
+  initialData?: any;
+  trigger?: React.ReactNode;
+}
 
-type WarehouseFormValues = z.infer<typeof warehouseSchema>;
+export default function WarehouseForm({ initialData, trigger }: WarehouseFormProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const isEdit = !!initialData;
 
-export function WarehouseForm({ onSuccess }: { onSuccess: () => void }) {
-  const [step, setStep] = useState(1);
-  const [error, setError] = useState<string | null>(null);
-  
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    trigger,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<WarehouseFormValues>({
-    resolver: zodResolver(warehouseSchema),
-    defaultValues: {
-      features: [],
-    }
+  const [formData, setFormData] = useState({
+    name: initialData?.name || "",
+    address: initialData?.address || "",
+    totalCapacity: initialData?.totalCapacity || "",
+    availableCapacity: initialData?.availableCapacity || "",
+    pricing: initialData?.pricing || "",
+    storageType: initialData?.storageType || "Dry",
+    availableFrom: initialData?.availableFrom ? new Date(initialData.availableFrom).toISOString().split('T')[0] : "",
+    materialsAllowed: initialData?.materialsAllowed || "",
+    wdraStatus: initialData?.wdraStatus || false,
+    gstNumber: initialData?.gstNumber || "",
+    features: initialData?.features || []
   });
 
-  const selectedFeatures = watch("features");
-
-  const toggleFeature = (feature: string) => {
-    const current = selectedFeatures;
-    if (current.includes(feature)) {
-      setValue("features", current.filter(f => f !== feature));
-    } else {
-      setValue("features", [...current, feature]);
-    }
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const nextStep = async () => {
-    let fieldsToValidate: any[] = [];
-    if (step === 1) fieldsToValidate = ["name", "address", "pricing"];
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    const isValid = await trigger(fieldsToValidate as any);
-    if (isValid) setStep(step + 1);
-  };
-
-  const prevStep = () => setStep(step - 1);
-
-  const onSubmit = async (data: WarehouseFormValues) => {
-    setError(null);
-    try {
-      const result = await createWarehouse(data);
-      if (result.success) {
-        toast.success("Warehouse registered successfully!");
-        reset();
-        onSuccess();
-      } else {
-        setError(result.error || "Failed to register warehouse");
-        toast.error(result.error || "Submission failed");
-      }
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred");
-      toast.error("Critical error during submission");
+    // 🛡️ CAPACITY VALIDATION LOGIC
+    const totalCapNum = parseFloat(formData.totalCapacity.toString());
+    const availCapNum = parseFloat(formData.availableCapacity.toString());
+    
+    if (availCapNum > totalCapNum) {
+      toast.error("Available capacity cannot exceed total capacity.");
+      return;
     }
-  };
 
-  const shakeVariants = {
-    shake: {
-      x: [0, -10, 10, -10, 10, 0],
-      transition: { duration: 0.4 }
+    setIsLoading(true);
+
+    const payload = {
+      ...formData,
+      totalCapacity: totalCapNum,
+      availableCapacity: availCapNum,
+      pricing: parseFloat(formData.pricing.toString()),
+      area: 0, // Legacy area support reset
+    };
+
+    const result = isEdit 
+      ? await updateWarehouse(initialData.id, payload as any)
+      : await createWarehouse(payload as any);
+
+    if (result.success) {
+      toast.success(isEdit ? "Facility metrics synchronized" : "Tonnage specifications transmitted to Admin");
+      setIsOpen(false);
+      if (!isEdit) setFormData({
+        name: "", address: "", totalCapacity: "", availableCapacity: "", pricing: "",
+        storageType: "Dry", availableFrom: "", materialsAllowed: "",
+        wdraStatus: false, gstNumber: "", features: []
+      });
+    } else {
+      toast.error(result.error);
     }
+    setIsLoading(false);
   };
 
   return (
-    <div className="relative">
-      {/* Stepper Progress */}
-      <div className="flex items-center justify-center gap-4 mb-10">
-        {[1, 2].map((s) => (
-          <div key={s} className="flex items-center gap-2">
-            <div className={cn(
-              "h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500",
-              step === s ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200 scale-110" : 
-              step > s ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-400"
-            )}>
-              {step > s ? <CheckCircle2 className="h-4 w-4" /> : s}
-            </div>
-            {s === 1 && <div className={cn("h-1 w-12 rounded-full transition-all duration-500", step > 1 ? "bg-emerald-500" : "bg-slate-100")} />}
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button className="bg-[#0f172a] hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest h-9 px-6 rounded-xl gap-2 shadow-lg shadow-slate-900/20">
+            <Plus className="h-3.5 w-3.5" /> Register New Facility
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden border-none rounded-3xl shadow-2xl">
+        <div className="bg-[#0f172a] p-6 text-white relative">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <Weight className="h-24 w-24" />
           </div>
-        ))}
-      </div>
+          <DialogHeader className="relative z-10">
+            <Badge className="w-fit bg-orange-600 text-white border-none font-black text-[9px] uppercase tracking-[0.2em] mb-4 italic">Facility Metrics Alignment</Badge>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight leading-none mb-1">
+              {isEdit ? "Synchronize Tonnage Records" : "Register Capacity Node"}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+              Prioritizing Weight-Based Operational Limits (Metric Tons)
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        <AnimatePresence mode="wait">
-          {step === 1 && (
-            <motion.div
-              key="step1"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Facility Name</label>
-                  <motion.div variants={shakeVariants} animate={errors.name ? "shake" : ""}>
-                    <div className="relative">
-                      <WarehouseIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-                      <input
-                        {...register("name")}
-                        placeholder="e.g. Central Silo A1"
-                        className="w-full pl-12 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-sm font-medium"
-                      />
-                    </div>
-                  </motion.div>
-                  {errors.name && <p className="text-[10px] text-rose-500 font-bold ml-1">{errors.name.message}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pricing (MT / Month)</label>
-                  <motion.div variants={shakeVariants} animate={errors.pricing ? "shake" : ""}>
-                    <div className="relative">
-                      <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-                      <input
-                        {...register("pricing")}
-                        type="number"
-                        placeholder="1500"
-                        className="w-full pl-12 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-sm font-medium"
-                      />
-                    </div>
-                  </motion.div>
-                  {errors.pricing && <p className="text-[10px] text-rose-500 font-bold ml-1">{errors.pricing.message}</p>}
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Strategic Location</label>
-                  <motion.div variants={shakeVariants} animate={errors.address ? "shake" : ""}>
-                    <div className="relative">
-                      <MapPin className="absolute left-4 top-4 h-5 w-5 text-slate-300" />
-                      <textarea
-                        {...register("address")}
-                        rows={3}
-                        placeholder="Complete facility address..."
-                        className="w-full pl-12 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-sm font-medium resize-none"
-                      />
-                    </div>
-                  </motion.div>
-                  {errors.address && <p className="text-[10px] text-rose-500 font-bold ml-1">{errors.address.message}</p>}
+        <form onSubmit={handleSubmit} className="p-8 space-y-8 bg-white max-h-[70vh] overflow-y-auto">
+          {/* Section 1: Core Identity & Capacity */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-l-4 border-indigo-600 pl-3">
+              <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Capacity Specifications</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Facility Name</label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                  <input name="name" required value={formData.name} onChange={handleChange} className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 transition-all" placeholder="e.g. BHARAT TERMINAL A1" />
                 </div>
               </div>
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div
-              key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-6"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Weight Capacity (MT)</label>
-                  <div className="relative">
-                    <Maximize className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-                    <input
-                      {...register("totalCapacity")}
-                      type="number"
-                      placeholder="1000"
-                      className="w-full pl-12 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-sm font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Availability (MT)</label>
-                  <div className="relative">
-                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
-                    <input
-                      {...register("availableCapacity")}
-                      type="number"
-                      placeholder="1000"
-                      className="w-full pl-12 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all text-sm font-medium"
-                    />
-                  </div>
+              
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Global Address</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                  <input name="address" required value={formData.address} onChange={handleChange} className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 transition-all" placeholder="CITY, STATE" />
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Premium Features</label>
-                <div className="flex flex-wrap gap-3">
-                  {[
-                    { id: "CCTV", icon: Shield, label: "24/7 Monitoring", desc: "Full CCTV coverage" },
-                    { id: "Cold Storage", icon: Snowflake, label: "Cold Chain", desc: "Climate controlled" },
-                    { id: "24/7 Access", icon: Clock, label: "Unlimited Access", desc: "Night operations supported" },
-                  ].map((feature) => {
-                    const isSelected = selectedFeatures.includes(feature.id);
-                    return (
-                      <button
-                        key={feature.id}
-                        type="button"
-                        onClick={() => toggleFeature(feature.id)}
-                        className={cn(
-                          "flex flex-1 min-w-[180px] items-center gap-4 p-4 rounded-2xl border transition-all duration-300 text-left group",
-                          isSelected
-                            ? "bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100"
-                            : "bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/30"
-                        )}
-                      >
-                        <div className={cn(
-                          "h-10 w-10 rounded-xl flex items-center justify-center transition-all",
-                          isSelected ? "bg-white/20" : "bg-slate-50 group-hover:bg-white"
-                        )}>
-                          <feature.icon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold">{feature.label}</p>
-                          <p className={cn("text-[9px] font-medium", isSelected ? "text-indigo-100" : "text-slate-400")}>{feature.desc}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Capacity (MT)</label>
+                <div className="relative">
+                  <Maximize className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                  <input name="totalCapacity" type="number" step="0.01" required value={formData.totalCapacity} onChange={handleChange} className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 transition-all" placeholder="e.g. 5000" />
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Available Capacity (MT)</label>
+                <div className="relative">
+                  <Weight className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                  <input name="availableCapacity" type="number" step="0.01" required value={formData.availableCapacity} onChange={handleChange} className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 transition-all" placeholder="e.g. 1200" />
+                </div>
+              </div>
 
-        <div className="pt-8 border-t border-slate-50 flex items-center justify-between">
-          {step > 1 ? (
+              <div className="md:col-span-2 flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <Info className="h-3 w-3 text-slate-400" />
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">All measurements are in Metric Tons (MT). Available capacity represents vacant space.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Storage Configuration */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-l-4 border-orange-500 pl-3">
+              <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Storage & Logistics</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Terminal Type</label>
+                <select name="storageType" value={formData.storageType} onChange={handleChange} className="w-full h-10 px-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase outline-none focus:border-orange-500">
+                  <option value="Dry">Dry Storage</option>
+                  <option value="Cold Storage">Cold Storage</option>
+                  <option value="Bonded">Bonded Warehouse</option>
+                  <option value="Open">Open Yard</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Operational Pricing (₹ / MT)</label>
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                  <input name="pricing" type="number" required value={formData.pricing} onChange={handleChange} className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-orange-500 transition-all" placeholder="0.00" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Available From</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                  <input name="availableFrom" type="date" required value={formData.availableFrom} onChange={handleChange} className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-orange-500 transition-all" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Materials Allowed</label>
+                <div className="relative">
+                  <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                  <input name="materialsAllowed" required value={formData.materialsAllowed} onChange={handleChange} className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-orange-500 transition-all" placeholder="e.g. GRAINS, STEEL, CHEMICALS" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Compliance & Legal */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 border-l-4 border-emerald-600 pl-3">
+              <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Compliance & Certification</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">GST Identification Number</label>
+                <div className="relative">
+                  <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
+                  <input name="gstNumber" required value={formData.gstNumber} onChange={handleChange} className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase outline-none focus:border-emerald-600 transition-all" placeholder="22AAAAA0000A1Z5" />
+                </div>
+              </div>
+              
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight">WDRA Registration</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Registered with WDRA Authority</p>
+                </div>
+                <Switch 
+                  checked={formData.wdraStatus}
+                  onCheckedChange={(checked) => setFormData({...formData, wdraStatus: checked})}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-slate-100 space-y-4">
             <Button 
-              type="button" 
-              variant="ghost" 
-              onClick={prevStep}
-              className="px-6 h-12 rounded-2xl gap-2 font-bold text-slate-400 hover:text-slate-900"
+              type="submit" 
+              disabled={isLoading}
+              className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-indigo-900/20 group transition-all"
             >
-              <ChevronLeft className="h-4 w-4" /> Back
+              {isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <div className="flex items-center gap-2">
+                  {isEdit ? "Update Tonnage Node" : "Transmit Capacity Request"} <ShieldCheck className="h-4 w-4" />
+                </div>
+              )}
             </Button>
-          ) : <div />}
-
-          <div className="flex items-center gap-3">
-            {step < 2 ? (
-              <Button 
-                type="button" 
-                onClick={nextStep}
-                className="bg-slate-900 hover:bg-slate-800 text-white px-8 h-12 rounded-2xl gap-2 font-bold shadow-xl shadow-slate-200 active:scale-[0.98] transition-all"
-              >
-                Continue <ChevronRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button 
-                type="submit" 
-                disabled={isSubmitting}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-10 h-12 rounded-2xl gap-2 font-black shadow-xl shadow-indigo-200 active:scale-[0.98] transition-all"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Finalizing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" /> Confirm & Register
-                  </>
-                )}
-              </Button>
+            {isEdit && (
+              <div className="flex items-center gap-2 justify-center bg-orange-50 p-2 rounded-lg">
+                <AlertCircle className="h-3.5 w-3.5 text-orange-600" />
+                <p className="text-[9px] font-bold text-orange-600 uppercase tracking-widest">Edit will trigger a mandatory Admin re-verification gate</p>
+              </div>
             )}
           </div>
-        </div>
-      </form>
-    </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

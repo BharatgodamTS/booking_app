@@ -30,12 +30,21 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid credentials");
         }
 
+        // 🛡️ EXPLICIT DATABASE QUERY (No Caching)
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: credentials.email.toLowerCase() },
         });
 
         if (!user) {
-          throw new Error("No user found with this email");
+          throw new Error("AUTHENTICATION_FAILED: Identity not found in registry.");
+        }
+
+        // 🛡️ ADMIN APPROVAL GATE
+        if (user.approvalStatus === "PENDING") {
+          throw new Error("ACCOUNT_PENDING: Verification in progress. Please wait for Admin activation.");
+        }
+        if (user.approvalStatus === "REJECTED") {
+          throw new Error("ACCOUNT_REJECTED: Access denied by administration.");
         }
 
         const isCorrectPassword = await bcrypt.compare(
@@ -44,7 +53,7 @@ export const authOptions: NextAuthOptions = {
         );
 
         if (!isCorrectPassword) {
-          throw new Error("Invalid credentials");
+          throw new Error("AUTHENTICATION_FAILED: Invalid credential pair.");
         }
 
         return {
@@ -52,15 +61,17 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role as any,
+          approvalStatus: user.approvalStatus
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.approvalStatus = (user as any).approvalStatus;
       }
       return token;
     },
@@ -68,24 +79,20 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as any;
+        (session.user as any).approvalStatus = token.approvalStatus;
       }
       return session;
     },
-    async redirect({ url, baseUrl, user }) {
-      // If we have a user object (during sign-in), redirect based on role
-      const role = (user as any)?.role;
-      if (role === 'ADMIN') return `${baseUrl}/admin/users`;
-      if (role === 'OWNER' || role === 'WAREHOUSE_OWNER') return `${baseUrl}/dashboard/warehouse`;
-      if (role === 'CLIENT') return `${baseUrl}/dashboard/client`;
-
-      // Fallback for relative and absolute URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      else if (new URL(url).origin === baseUrl) return url;
+    async redirect({ url, baseUrl }) {
+      // Force clean redirects for role-based onboarding
+      if (url.startsWith(baseUrl)) return url;
+      if (url.startsWith("/")) return new URL(url, baseUrl).toString();
       return baseUrl;
     },
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
     signIn: "/auth/signin",

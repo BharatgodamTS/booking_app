@@ -12,7 +12,8 @@ import {
   LogOut, 
   Menu,
   User as UserIcon,
-  ChevronRight
+  ChevronRight,
+  ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -21,6 +22,8 @@ import { cn } from "@/lib/utils";
 const adminNavItems = [
   { label: "Users", href: "/admin/users", icon: Users },
   { label: "Verification", href: "/admin/warehouses", icon: ShieldCheck },
+  { label: "Approvals", href: "/admin/approvals", icon: UserIcon },
+  { label: "Master Bookings", href: "/admin/bookings", icon: ClipboardList },
 ];
 
 export default function AdminLayout({

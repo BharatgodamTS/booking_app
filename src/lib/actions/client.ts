@@ -22,10 +22,18 @@ export async function getClientDashboardStats() {
   return { totalWeight, activeBookings, pendingRequests };
 }
 
-export async function searchWarehouses(query: string = "") {
+export async function searchWarehouses(query: string = "", minWeight: number = 0) {
+  // Console.log debugging script as requested
+  console.log("🔍 [BACKEND-SEARCH-TRACE]", {
+    query: query || "ALL",
+    minWeight: `${minWeight} MT`,
+    timestamp: new Date().toISOString()
+  });
+
   return await prisma.warehouse.findMany({
     where: {
       status: 'APPROVED',
+      availableCapacity: { gte: minWeight },
       OR: [
         { name: { contains: query } },
         { address: { contains: query } }

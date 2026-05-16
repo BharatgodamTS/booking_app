@@ -35,6 +35,10 @@ export default withAuth(
       return NextResponse.redirect(new URL("/unauthorized", req.url));
     }
 
+    if (path.startsWith("/dashboard/client") && role !== "CLIENT") {
+      return NextResponse.redirect(new URL("/unauthorized", req.url));
+    }
+
     return NextResponse.next();
   },
   {

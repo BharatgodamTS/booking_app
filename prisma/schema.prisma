@@ -9,13 +9,25 @@ datasource db {
 
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  password      String
-  role          String    @default("CLIENT") // ADMIN, OWNER, CLIENT
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  name              String?
+  email             String?   @unique
+  password          String
+  phone             String?
+  location          String?
+  role              String    @default("CLIENT") // ADMIN, OWNER, CLIENT
+  approvalStatus    String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  // Role-specific Metadata
+  companyName       String?   // For OWNERS
+  warehouseCount    Int?      // For OWNERS
+  city              String?   // For CLIENTS
+  businessType      String?   // For CLIENTS
+  gstNumber         String?   // For CLIENTS
+  requirements      String?   // For CLIENTS
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   // Relations
   warehouses    Warehouse[] // For OWNERS
@@ -27,10 +39,17 @@ model Warehouse {
   id                String    @id @default(cuid())
   name              String
   address           String
+  area              Float?    // In Square Feet
   totalCapacity     Float     // In Metric Tons (MT)
   availableCapacity Float     // Current capacity in MT
   pricing           Float     // Price per MT
-  features          String    // Comma-separated list
+  storageType       String?   // Cold Storage, Dry, Bonded, Open
+  availableFrom     DateTime?
+  materialsAllowed  String?   // Grains, Chemicals, etc.
+  wdraStatus        Boolean   @default(false)
+  gstNumber         String?
+  images            String?   // Comma-separated image URLs or JSON
+  features          String?   // Comma-separated list
   status            String    @default("PENDING") // PENDING, APPROVED, REJECTED, DEACTIVATED
   rejectionReason   String?   // Feedback for owners if rejected
   ownerId           String

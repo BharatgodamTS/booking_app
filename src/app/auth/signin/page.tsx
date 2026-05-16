@@ -4,22 +4,34 @@ import { signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { LayoutDashboard, Lock, Mail, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { LayoutDashboard, Lock, Mail, Loader2, ShieldCheck, AlertCircle, Package } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  email: z.string().email("Industrial email identity required"),
+  password: z.string().min(6, "Credentials must meet 6-char security minimum"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Check for errors in URL (from NextAuth redirects)
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam === "CredentialsSignin") {
+      setError("AUTHENTICATION_FAILED: Invalid credential pair.");
+    } else if (errorParam) {
+      setError(`SYSTEM_ERROR: ${errorParam}`);
+    }
+  }, [searchParams]);
 
   const {
     register,
@@ -34,114 +46,148 @@ export default function SignInPage() {
     setError(null);
 
     try {
+      // 🛡️ CLEAN LOGIN PROTOCOL
       const result = await signIn("credentials", {
-        email: data.email,
+        email: data.email.toLowerCase(),
         password: data.password,
-        redirect: false, // Handle manually
+        redirect: false,
       });
 
       if (result?.ok) {
-        // Redirection logic is also handled in auth.ts, 
-        // but explicit push ensures client-side transitions.
-        router.push("/dashboard/warehouse");
+        // Force session parity and redirect based on role
+        // NextAuth doesn't return the user in the result, so we fetch it or use the redirect callback logic
+        // For simplicity and speed, we refresh and let middleware/layout handle the specific landing
+        router.push("/dashboard"); // This will hit the proxy and redirect correctly
         router.refresh();
       } else if (result?.error) {
-        setError("Invalid email or password");
+        // Parse custom error messages from authorize()
+        if (result.error.includes("ACCOUNT_PENDING")) {
+          setError("PENDING_VERIFICATION: Your identity is currently being audited by Administration.");
+        } else if (result.error.includes("ACCOUNT_REJECTED")) {
+          setError("ACCESS_DENIED: Operational privileges have been revoked.");
+        } else {
+          setError("AUTHENTICATION_FAILED: Invalid identity or credential pair.");
+        }
         setIsLoading(false);
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
+      setError("SYSTEM_TIMEOUT: Communication with Identity Registry failed.");
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <Card className="w-full max-w-md shadow-xl border-slate-200">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="rounded-full bg-indigo-600 p-3 text-white">
-              <LayoutDashboard className="h-6 w-6" />
+    <div className="flex min-h-screen items-center justify-center bg-[#f8fafc] px-4 relative overflow-hidden">
+      {/* Background Industrial Accents */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-indigo-600" />
+      <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-50 rounded-full opacity-50 blur-3xl" />
+      
+      <Card className="w-full max-w-md shadow-2xl border-slate-200 rounded-3xl overflow-hidden bg-white relative z-10">
+        <CardHeader className="space-y-4 text-center pb-8 pt-10">
+          <div className="flex justify-center">
+            <div className="h-14 w-14 bg-[#0f172a] rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-900/20">
+              <Package className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">Welcome back</CardTitle>
-          <CardDescription>
-            Enter your credentials to access your dashboard
-          </CardDescription>
+          <div className="space-y-1">
+            <CardTitle className="text-2xl font-black tracking-tight uppercase italic text-slate-900">
+              Bharat<span className="text-indigo-600">Godam</span>
+            </CardTitle>
+            <CardDescription className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+              Industrial Logistics Handshake
+            </CardDescription>
+          </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        
+        <CardContent className="pb-10 px-8">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {error && (
-              <div className="rounded-md bg-rose-50 p-3 text-sm text-rose-600 border border-rose-100 flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-600" />
-                {error}
+              <div className="rounded-2xl bg-rose-50 p-4 text-[11px] font-bold text-rose-600 border border-rose-100 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
               </div>
             )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 ml-1">Email Address</label>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Node</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
                 <input
                   {...register("email")}
                   type="email"
-                  placeholder="name@example.com"
-                  className={`w-full pl-10 pr-4 py-2 bg-white border ${
-                    errors.email ? "border-rose-500" : "border-slate-200"
-                  } rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all`}
+                  placeholder="corp@domain.com"
+                  className={cn(
+                    "w-full h-12 pl-12 pr-4 bg-slate-50 border rounded-2xl text-xs font-bold outline-none transition-all",
+                    errors.email ? "border-rose-300 focus:border-rose-500" : "border-slate-200 focus:border-indigo-600"
+                  )}
                   disabled={isLoading}
                 />
               </div>
               {errors.email && (
-                <p className="text-[11px] text-rose-600 font-medium ml-1">{errors.email.message}</p>
+                <p className="text-[9px] text-rose-600 font-black uppercase tracking-tighter ml-1">{errors.email.message}</p>
               )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between ml-1">
-                <label className="text-sm font-medium text-slate-700">Password</label>
-                <a href="#" className="text-[11px] text-indigo-600 hover:underline">Forgot password?</a>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Key</label>
+                <button type="button" className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Reset</button>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300" />
                 <input
                   {...register("password")}
                   type="password"
                   placeholder="••••••••"
-                  className={`w-full pl-10 pr-4 py-2 bg-white border ${
-                    errors.password ? "border-rose-500" : "border-slate-200"
-                  } rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all`}
+                  className={cn(
+                    "w-full h-12 pl-12 pr-4 bg-slate-50 border rounded-2xl text-xs font-bold outline-none transition-all",
+                    errors.password ? "border-rose-300 focus:border-rose-500" : "border-slate-200 focus:border-indigo-600"
+                  )}
                   disabled={isLoading}
                 />
               </div>
               {errors.password && (
-                <p className="text-[11px] text-rose-600 font-medium ml-1">{errors.password.message}</p>
+                <p className="text-[9px] text-rose-600 font-black uppercase tracking-tighter ml-1">{errors.password.message}</p>
               )}
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed mt-2"
+              className="w-full h-12 flex items-center justify-center gap-3 rounded-2xl bg-indigo-600 text-xs font-black text-white uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/20 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed mt-4 group"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Signing in...</span>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Synchronizing...</span>
                 </>
               ) : (
-                <span>Sign In</span>
+                <>
+                  <span>Authenticate Session</span>
+                  <ShieldCheck className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                </>
               )}
             </button>
           </form>
           
-          <div className="mt-6 text-center">
-            <p className="text-sm text-slate-500">
-              Don't have an account?{" "}
-              <a href="#" className="text-indigo-600 font-semibold hover:underline">Request access</a>
+          <div className="mt-8 text-center pt-6 border-t border-slate-50">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Unverified Participant?{" "}
+              <a href="/auth/signup" className="text-indigo-600 font-black hover:underline">Request Onboarding</a>
             </p>
           </div>
         </CardContent>
       </Card>
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-500">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-16 w-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">Establishing Operational Link...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
